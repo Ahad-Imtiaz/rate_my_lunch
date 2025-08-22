@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,14 +63,27 @@ class LunchPageState extends State<LunchPage> {
   String description = '';
   Uint8List? imageBytes;
   bool isLoading = false;
-  String userId = 'user1';
+  String userId = '';
   DateTime? selectedDate;
 
   final Set<String> selectedEntries = {};
 
   final TextEditingController descriptionController = TextEditingController();
+  final TextEditingController userIdController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    userIdController.text = userId;
+    loadUsername();
+  }
 
   Future<void> submitEntry() async {
+    if (userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please write a username')));
+      return;
+    }
+
     if (imageBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an image')));
       return;
@@ -93,6 +107,7 @@ class LunchPageState extends State<LunchPage> {
         'image_url': imageUrl,
       });
 
+      saveUsername(userId);
       setState(() {
         rating = 5;
         description = '';
@@ -143,7 +158,14 @@ class LunchPageState extends State<LunchPage> {
               panEnabled: true,
               minScale: 1,
               maxScale: 5,
-              child: Image.network(data['image_url'], height: 200),
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.5,
+                height: MediaQuery.of(context).size.height * 0.35,
+                child: Image.network(
+                  data['image_url'],
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
             const SizedBox(height: 10),
             Text(data['description']),
@@ -156,6 +178,22 @@ class LunchPageState extends State<LunchPage> {
         ],
       ),
     );
+  }
+
+  Future<void> saveUsername(String username) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('username', username);
+  }
+
+  Future<void> loadUsername() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUser = prefs.getString('username');
+    if (savedUser != null) {
+      setState(() {
+        userId = savedUser;
+        userIdController.text = userId;
+      });
+    }
   }
 
   @override
@@ -179,6 +217,7 @@ class LunchPageState extends State<LunchPage> {
         child: Column(
           children: [
             TextField(
+              controller: userIdController,
               decoration: const InputDecoration(labelText: 'Your Username'),
               onChanged: (val) => userId = val,
             ),
