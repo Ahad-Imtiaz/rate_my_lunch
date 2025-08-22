@@ -1,10 +1,11 @@
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +15,7 @@ void main() async {
       apiKey: "AIzaSyBxuNHhZdedxLnetQqQ8evQGOLph29ixqs",
       authDomain: "ratemylunch-2270c.firebaseapp.com",
       projectId: "ratemylunch-2270c",
-      storageBucket: "ratemylunch-2270c.firebasestorage.app",
+      storageBucket: "ratemylunch-2270c.appspot.com",
       messagingSenderId: "702467284612",
       appId: "1:702467284612:web:50bbc8b5d93397966eacd1",
       measurementId: "G-X2G80G0F26",
@@ -65,9 +66,15 @@ class LunchPageState extends State<LunchPage> {
   String userId = 'user1';
   DateTime? selectedDate;
 
-  final Set<String> selectedEntries = {};
-
   final TextEditingController descriptionController = TextEditingController();
+  final TextEditingController userIdController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    userIdController.text = userId;
+    loadUsername();
+  }
 
   Future<void> submitEntry() async {
     if (imageBytes == null) {
@@ -93,6 +100,7 @@ class LunchPageState extends State<LunchPage> {
         'image_url': imageUrl,
       });
 
+      saveUsername(userId);
       setState(() {
         rating = 5;
         description = '';
@@ -143,7 +151,12 @@ class LunchPageState extends State<LunchPage> {
               panEnabled: true,
               minScale: 1,
               maxScale: 5,
-              child: Image.network(data['image_url'], height: 200),
+              child: CachedNetworkImage(
+                imageUrl: data['image_url'],
+                placeholder: (context, url) => const CircularProgressIndicator(),
+                errorWidget: (context, url, error) => const Icon(Icons.error),
+                height: 200,
+              ),
             ),
             const SizedBox(height: 10),
             Text(data['description']),
@@ -156,6 +169,22 @@ class LunchPageState extends State<LunchPage> {
         ],
       ),
     );
+  }
+
+  Future<void> saveUsername(String username) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('username', username);
+  }
+
+  Future<void> loadUsername() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUser = prefs.getString('username');
+    if (savedUser != null) {
+      setState(() {
+        userId = savedUser;
+        userIdController.text = userId;
+      });
+    }
   }
 
   @override
@@ -179,8 +208,12 @@ class LunchPageState extends State<LunchPage> {
         child: Column(
           children: [
             TextField(
+              controller: userIdController,
               decoration: const InputDecoration(labelText: 'Your Username'),
-              onChanged: (val) => userId = val,
+              onChanged: (val) {
+                setState(() => userId = val);
+                saveUsername(val);
+              },
             ),
             const SizedBox(height: 10),
             Row(
@@ -199,7 +232,29 @@ class LunchPageState extends State<LunchPage> {
               onPressed: pickImage,
               child: Text(imageBytes == null ? 'Pick Image' : 'Change Image'),
             ),
-            if (imageBytes != null) Image.memory(imageBytes!, height: 150, width: 150),
+            if (imageBytes != null)
+              Stack(
+                alignment: Alignment.topRight,
+                children: [
+                  Image.memory(imageBytes!, height: 150, width: 150, fit: BoxFit.cover),
+                  IconButton(
+                    icon: const Icon(Icons.fullscreen, color: Colors.white),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => Dialog(
+                          child: InteractiveViewer(
+                            panEnabled: true,
+                            minScale: 1,
+                            maxScale: 5,
+                            child: Image.memory(imageBytes!),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             const SizedBox(height: 10),
             TextField(
               controller: descriptionController,
@@ -247,47 +302,26 @@ class LunchPageState extends State<LunchPage> {
                   return (dataB['rating'] as int).compareTo(dataA['rating'] as int);
                 });
 
-                double averageRating = 0;
-                final selectedDocs = filteredDocs.where((doc) => selectedEntries.contains(doc.id)).toList();
-                if (selectedDocs.isNotEmpty) {
-                  final total = selectedDocs.fold<int>(0, (sum, doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    return sum + (data['rating'] as int);
-                  });
-                  averageRating = total / selectedDocs.length;
-                }
-
-                return Column(
-                  children: [
-                    Text('Average Rating: ${averageRating.toStringAsFixed(1)} / 10',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const Text('(Select lunches to calculate average rating.)'),
-                    const Text('(Long click on lunch to open details.)'),
-                    const SizedBox(height: 10),
-                    ...filteredDocs.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final isSelected = selectedEntries.contains(doc.id);
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        color: isSelected ? Colors.orange[100] : null,
-                        child: ListTile(
-                          leading: Image.network(data['image_url'], width: 50, height: 50, fit: BoxFit.cover),
-                          title: Text('${data['user']} - Rating: ${data['rating']}'),
-                          subtitle: Text('${data['description']}\nDate: ${data['date']}'),
-                          onTap: () {
-                            setState(() {
-                              if (isSelected) {
-                                selectedEntries.remove(doc.id);
-                              } else {
-                                selectedEntries.add(doc.id);
-                              }
-                            });
-                          },
-                          onLongPress: () => showEntryDetails(data),
-                        ),
-                      );
-                    }),
-                  ],
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filteredDocs.length,
+                  itemBuilder: (context, index) {
+                    final data = filteredDocs[index].data() as Map<String, dynamic>;
+                    return ListTile(
+                      leading: CachedNetworkImage(
+                        imageUrl: data['image_url'],
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const CircularProgressIndicator(),
+                        errorWidget: (context, url, error) => const Icon(Icons.error),
+                      ),
+                      title: Text('${data['user']} - Rating: ${data['rating']}'),
+                      subtitle: Text(data['description']),
+                      onTap: () => showEntryDetails(data),
+                    );
+                  },
                 );
               },
             ),
