@@ -65,8 +65,9 @@ class LunchPageState extends State<LunchPage> {
   String userId = 'user1';
   DateTime? selectedDate;
 
-  // Track selected entries for average calculation
   final Set<String> selectedEntries = {};
+
+  final TextEditingController descriptionController = TextEditingController();
 
   Future<void> submitEntry() async {
     if (imageBytes == null) {
@@ -95,6 +96,7 @@ class LunchPageState extends State<LunchPage> {
       setState(() {
         rating = 5;
         description = '';
+        descriptionController.clear();
         imageBytes = null;
       });
     } catch (e) {
@@ -160,7 +162,6 @@ class LunchPageState extends State<LunchPage> {
   Widget build(BuildContext context) {
     final today = DateTime.now();
     final sevenDaysAgo = today.subtract(const Duration(days: 7));
-
     final filterDate = selectedDate ?? today;
 
     return Scaffold(
@@ -201,6 +202,7 @@ class LunchPageState extends State<LunchPage> {
             if (imageBytes != null) Image.memory(imageBytes!, height: 150, width: 150),
             const SizedBox(height: 10),
             TextField(
+              controller: descriptionController,
               decoration: const InputDecoration(labelText: 'Description'),
               onChanged: (val) => description = val,
             ),
@@ -239,14 +241,12 @@ class LunchPageState extends State<LunchPage> {
                   return data['date'] == filterDate.toIso8601String().split('T')[0];
                 }).toList();
 
-                // Sort by rating descending
                 filteredDocs.sort((a, b) {
                   final dataA = a.data() as Map<String, dynamic>;
                   final dataB = b.data() as Map<String, dynamic>;
                   return (dataB['rating'] as int).compareTo(dataA['rating'] as int);
                 });
 
-                // Calculate average based on selected entries
                 double averageRating = 0;
                 final selectedDocs = filteredDocs.where((doc) => selectedEntries.contains(doc.id)).toList();
                 if (selectedDocs.isNotEmpty) {
@@ -261,7 +261,7 @@ class LunchPageState extends State<LunchPage> {
                   children: [
                     Text('Average Rating: ${averageRating.toStringAsFixed(1)} / 10',
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const Text('(Select lunches to claculate average rating.)'),
+                    const Text('(Select lunches to calculate average rating.)'),
                     const Text('(Long click on lunch to open details.)'),
                     const SizedBox(height: 10),
                     ...filteredDocs.map((doc) {
