@@ -154,14 +154,21 @@ class LunchPageState extends State<LunchPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            InteractiveViewer(
-              panEnabled: true,
-              minScale: 1,
-              maxScale: 5,
-              child: Image.network(
-                data['image_url'],
-                fit: BoxFit.contain,
-                width: MediaQuery.of(context).size.width,
+            Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 1,
+                maxScale: 5,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.8,
+                    maxHeight: MediaQuery.of(context).size.height * 0.5,
+                  ),
+                  child: Image.network(
+                    data['image_url'],
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 10),
