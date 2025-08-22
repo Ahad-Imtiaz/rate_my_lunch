@@ -114,12 +114,16 @@ class LunchPageState extends State<LunchPage> {
   }
 
   Future<void> pickDate() async {
+    final today = DateTime.now();
+    final sevenDaysAgo = today.subtract(const Duration(days: 7));
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      initialDate: selectedDate ?? today,
+      firstDate: sevenDaysAgo,
+      lastDate: today,
     );
+
     if (picked != null) {
       setState(() => selectedDate = picked);
     }
