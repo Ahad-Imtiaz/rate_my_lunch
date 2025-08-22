@@ -158,13 +158,10 @@ class LunchPageState extends State<LunchPage> {
               panEnabled: true,
               minScale: 1,
               maxScale: 5,
-              child: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.5,
-                height: MediaQuery.of(context).size.height * 0.35,
-                child: Image.network(
-                  data['image_url'],
-                  fit: BoxFit.cover,
-                ),
+              child: Image.network(
+                data['image_url'],
+                fit: BoxFit.contain,
+                width: MediaQuery.of(context).size.width,
               ),
             ),
             const SizedBox(height: 10),
